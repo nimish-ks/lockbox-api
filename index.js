@@ -54,10 +54,8 @@ async function deleteData(request) {
   }  
 }
 
-async function postData(request) {  
-  const ip = request.headers.get('CF-Connecting-IP')
-  const json = await request.json() 
-  
+async function postData(request) {    
+  const json = await request.json()   
   try {
     const cacheKey = json.hash
     let data = request.headers
