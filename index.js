@@ -1,9 +1,10 @@
-const setCache = (key, data) => LOCKBOX_APP.put(key, data)
+const setCache = (key, data, expiryTtl) => LOCKBOX_APP.put(key, data, {expirationTtl: expiryTtl})
 const getCache = key => LOCKBOX_APP.get(key)
+const deleteCache = key => LOCKBOX_APP.delete(key)
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
 
@@ -17,6 +18,7 @@ async function getData(request) {
       if (!cache) {
         return new Response(null, {
           status:404,
+          headers: corsHeaders
         })
       } else {
         data = JSON.parse(cache)        
@@ -35,6 +37,23 @@ async function getData(request) {
   }
 }
 
+async function deleteData(request) {  
+  const json = await request.json()
+  try {
+    const cacheKey = json.hash
+    await deleteCache(cacheKey)
+    return new Response(JSON.stringify({}), {
+        status:200,
+        headers: corsHeaders
+      })
+  } catch (err) {
+    console.log(err)
+    return new Response(err, { 
+      status: 500,
+      headers: corsHeaders })
+  }  
+}
+
 async function postData(request) {  
   const ip = request.headers.get('CF-Connecting-IP')
   const json = await request.json() 
@@ -43,14 +62,17 @@ async function postData(request) {
     const cacheKey = json.hash
     let data = request.headers
     data.content = json.data
-    await setCache(cacheKey, JSON.stringify(data))
+    let expiryTtl = json.expiry * 86400; // convert days to seconds
+    await setCache(cacheKey, JSON.stringify(data), expiryTtl)
     return new Response(JSON.stringify({"saved":"true"}), { 
       status: 200,
       headers: corsHeaders
      })
   } catch (err) {
     console.log(err)
-    return new Response(err, { status: 500 })
+    return new Response(err, { 
+      status: 500,
+      headers: corsHeaders })
   }
 }
 
@@ -65,12 +87,15 @@ async function handleRequest(request) {
     return postData(request)
   } else if (request.method === 'GET') {
     return getData(request)
+  } else if (request.method === 'DELETE') {
+    return deleteData(request)
   } if (request.method === "OPTIONS") {
     return handleOptions(request)
   }else {
     return new Response(null, {
       status: 405,
       statusText: "Method Not Allowed",
+      headers: corsHeaders
     })
   }
 }
